@@ -221,12 +221,14 @@ def generate_protobufs(proto_path, options_path=None, output_dir=None, nanopb_di
         resolved_options = _expand_with_env(env, options_path)
         resolved_output = _expand_with_env(env, output_dir)
         resolved_nanopb = _expand_with_env(env, nanopb_dir)
-        return generate_protobuf_files(
+        success = generate_protobuf_files(
             proto_file=resolved_proto,
             options_file=resolved_options,
             output_dir=resolved_output,
             nanopb_dir=resolved_nanopb,
         )
+        if not success:
+            raise RuntimeError(f"Failed to generate protobufs for {resolved_proto}")
 
     return _action
 
