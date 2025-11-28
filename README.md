@@ -1,6 +1,6 @@
 # LoDB - Micro Database for Meshtastic
 
-**A synchronous, protobuf-based database for Meshtastic**
+**A Meshtastic firmware plugin providing a synchronous, protobuf-based database**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -17,33 +17,30 @@ LoDB provides CRUD operations with powerful SELECT queries supporting filtering,
 - **Filesystem-Based**: Simple, human-readable file structure on any filesystem
 - **Memory Efficient**: Designed for resource-constrained embedded systems
 
-## Getting Started
+## Installation
 
-### 1. Install LoDB as a Submodule
+LoDB is a Meshtastic plugin that is automatically discovered and integrated by the Meshtastic Plugin Manager (MPM). To install LoDB:
+
+1. **Clone LoDB into the plugins directory:**
 
 ```bash
-git submodule add https://github.com/MeshEnvy/lodb.git src/lodb
+cd /path/to/meshtastic/firmware
+git clone https://github.com/MeshEnvy/lodb.git src/plugins/lodb
 ```
 
-Add `src/lodb/` to your repository and ensure it stays in sync when LoDB evolves.
+2. **Build and flash:**
 
-### 2. Wire Up Protobuf Generation
+The Meshtastic Plugin Manager automatically discovers the plugin, generates protobuf files (if the plugin uses any), and integrates it into the build. Simply build and flash as usual:
 
-Inside your PlatformIO build script (e.g. `bin/platformio-custom.py`), register the `.proto` files that belong to your module:
-
-```python
-from gen_proto import register_protobufs
-
-register_protobufs(
-    env,
-    "$BUILD_DIR/src/modules/MyModule/MyModule.cpp.o",
-    "$PROJECT_DIR/src/modules/MyModule/myschema.proto",
-)
+```bash
+pio run -e esp32 -t upload
 ```
 
-This attaches a pre-build action so nanopb-generated files stay current.
+**Note:** For detailed information about Meshtastic plugin development, see the [Plugin Development Guide](/path/to/meshtastic/src/plugins/README.md).
 
-### 3. Build a Simple Module
+## Getting Started
+
+### Using LoDB
 
 **Define the schema:**
 
@@ -64,21 +61,19 @@ User.username max_size:32
 User.password_hash max_size:32
 ```
 
-**Generate code:**
-
-```bash
-python src/lodb/gen_proto.py src/modules/MyModule/myschema.proto --output-dir src/modules/MyModule/
-```
+**Note:** Protobuf generation is handled automatically by the Meshtastic Plugin Manager.
 
 **Initialize the database:**
 
 ```cpp
-#include "lodb/LoDB.h"
+#include "LoDB.h"
 #include "myschema.pb.h"
 
 LoDb *db = new LoDb("myapp");
 db->registerTable("users", &User_msg, sizeof(User));
 ```
+
+**Note:** The include path is simply `"LoDB.h"` because the plugin's `src/` directory is automatically added to the compiler's include path.
 
 **Perform CRUD operations:**
 
@@ -795,42 +790,10 @@ std::vector<void *> getPage(LoDb *db, size_t pageNum) {
 }
 ```
 
-## Build Integration
-
-LoDB includes a generalized protobuf generation script that works with any `.proto` schema.
-
-### Using `gen_proto.py`
-
-Each module that defines protobuf schemas can call `register_protobufs()` from `src/lodb/gen_proto.py` directly within PlatformIO/SCons build scripts—see `bin/platformio-custom.py` for an example registering pre-actions for specific `.proto` files.
-
-```python
-from gen_proto import register_protobufs
-
-register_protobufs(
-    env,
-    "$BUILD_DIR/src/modules/LoBBSModule/LoBBSModule.cpp.o",
-    "$PROJECT_DIR/src/modules/LoBBSModule/lobbs.proto",
-)
-```
-
-#### Standalone Usage
-
-```bash
-python src/lodb/gen_proto.py src/modules/LoBBSModule/*.proto --output-dir src/modules/LoBBSModule/
-```
-
-The script will:
-
-1. Check if generated files are up to date
-2. Skip generation if no changes detected
-3. Generate `.pb.h` and `.pb.cpp` files using nanopb
-4. Handle platform differences (Windows vs Unix)
-
 ### Requirements
 
 - Python 3.x
 - nanopb 0.4.9+ (included in Meshtastic firmware)
-- Protocol Buffers compiler (included with nanopb)
 - Meshtastic 2.7 or higher
 
 ## License
