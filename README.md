@@ -21,14 +21,20 @@ LoDB provides CRUD operations with powerful SELECT queries supporting filtering,
 
 LoDB is a Meshtastic plugin that is automatically discovered and integrated by the Meshtastic Plugin Manager (MPM). To install LoDB:
 
-1. **Clone LoDB into the plugins directory:**
+1. **Install the Meshtastic Plugin Manager:**
+
+```bash
+pip install mesh-plugin-manager
+```
+
+2. **Install LoDB:**
 
 ```bash
 cd /path/to/meshtastic/firmware
-git clone https://github.com/MeshEnvy/lodb.git src/plugins/lodb
+mpm install lodb
 ```
 
-2. **Build and flash:**
+3. **Build and flash:**
 
 The Meshtastic Plugin Manager automatically discovers the plugin, generates protobuf files (if the plugin uses any), and integrates it into the build. Simply build and flash as usual:
 
