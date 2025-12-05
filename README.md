@@ -19,24 +19,20 @@ LoDB provides CRUD operations with powerful SELECT queries supporting filtering,
 
 ## Installation
 
-LoDB is a Meshtastic plugin that is automatically discovered and integrated by the Meshtastic Plugin Manager (MPM). To install LoDB:
+LoDB is a PlatformIO library that can be added to your Meshtastic firmware build. To install LoDB:
 
-1. **Install the Meshtastic Plugin Manager:**
+1. **Add LoDB to your `platformio.ini`:**
 
-```bash
-pip install mesh-plugin-manager
+Add LoDB to the `lib_deps` section in your `platformio.ini`:
+
+```ini
+lib_deps =
+    file://../../lodb
 ```
 
-2. **Install LoDB:**
+2. **Build and flash:**
 
-```bash
-cd /path/to/meshtastic/firmware
-mpm install lodb
-```
-
-3. **Build and flash:**
-
-The Meshtastic Plugin Manager automatically discovers the plugin, generates protobuf files (if the plugin uses any), and integrates it into the build. Simply build and flash as usual:
+PlatformIO will automatically discover the library and integrate it into the build. Simply build and flash as usual:
 
 ```bash
 pio run -e esp32 -t upload
@@ -67,7 +63,7 @@ User.username max_size:32
 User.password_hash max_size:32
 ```
 
-**Note:** Protobuf generation is handled automatically by the Meshtastic Plugin Manager.
+**Note:** If your application uses protobuf files, you should pre-generate them using nanopb and commit them to your repository.
 
 **Initialize the database:**
 
