@@ -2,4 +2,4 @@
 
 #include "LoDB.h"
 
-#define LODB_VERSION "1.0.2"
+#define LODB_VERSION "1.1.0"
