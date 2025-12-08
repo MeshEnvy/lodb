@@ -166,6 +166,24 @@ class LoDb
     std::vector<void *> select(const char *table_name, LoDbFilter filter = LoDbFilter(),
                                LoDbComparator comparator = LoDbComparator(), size_t limit = 0);
 
+    /**
+     * Free a vector of records returned by select()
+     * @param records Vector of record pointers to free
+     */
+    static void freeRecords(std::vector<void *> &records);
+
+    /**
+     * Count records in a table with optional filtering
+     * 
+     * If no filter is provided, this efficiently counts files without loading records.
+     * If a filter is provided, records are loaded and filtered (less efficient).
+     * 
+     * @param table_name Name of the table to count
+     * @param filter Optional filter function (NULL to count all records)
+     * @return Number of matching records, or -1 on error
+     */
+    int count(const char *table_name, LoDbFilter filter = LoDbFilter());
+
   private:
     /**
      * Table metadata

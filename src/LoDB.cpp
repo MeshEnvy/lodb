@@ -502,3 +502,91 @@ std::vector<void *> LoDb::select(const char *table_name, LoDbFilter filter, LoDb
 
     return results;
 }
+
+// Free a vector of records returned by select()
+void LoDb::freeRecords(std::vector<void *> &records)
+{
+    for (auto *recordPtr : records) {
+        delete[] (uint8_t *)recordPtr;
+    }
+    records.clear();
+}
+
+// Count records in a table with optional filtering
+int LoDb::count(const char *table_name, LoDbFilter filter)
+{
+    if (!table_name) {
+        LOG_ERROR("Invalid table_name");
+        return -1;
+    }
+
+    TableMetadata *table = getTable(table_name);
+    if (!table) {
+        LOG_ERROR("Table not found: %s", table_name);
+        return -1;
+    }
+
+#ifdef FSCom
+    int count = 0;
+
+    // If no filter, efficiently count files without loading records
+    if (!filter) {
+        concurrency::LockGuard g(spiLock);
+
+        File dir = FSCom.open(table->table_path, FILE_O_READ);
+        if (!dir) {
+            LOG_DEBUG("Table directory not found: %s", table->table_path);
+            return 0; // Empty table
+        }
+
+        if (!dir.isDirectory()) {
+            LOG_ERROR("Table path is not a directory: %s", table->table_path);
+            dir.close();
+            return -1;
+        }
+
+        // Count .pr files
+        while (true) {
+            File file = dir.openNextFile();
+            if (!file) {
+                break; // No more files
+            }
+
+            // Skip directories
+            if (file.isDirectory()) {
+                file.close();
+                continue;
+            }
+
+            // Get filename
+            std::string pathStr = file.name();
+            file.close();
+
+            // Extract just the filename (after last /)
+            size_t lastSlash = pathStr.rfind('/');
+            std::string filename = (lastSlash != std::string::npos) ? pathStr.substr(lastSlash + 1) : pathStr;
+
+            // Check if it's a .pr file
+            if (filename.find(".pr") != std::string::npos) {
+                count++;
+            }
+        }
+
+        dir.close();
+        LOG_DEBUG("Counted %d records in %s (no filter)", count, table_name);
+        return count;
+    }
+
+    // Filter provided - need to load records to check them
+    // Use select() but don't keep the records, just count
+    auto results = select(table_name, filter, LoDbComparator(), 0);
+    count = results.size();
+    freeRecords(results);
+
+    LOG_DEBUG("Counted %d records in %s (with filter)", count, table_name);
+    return count;
+#else
+    LOG_ERROR("Filesystem not available");
+    return -1;
+#endif
+}

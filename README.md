@@ -278,9 +278,7 @@ for (size_t i = 0; i < users.size(); i++) {
 }
 
 // Free allocated records
-for (auto *userPtr : users) {
-    delete[] (uint8_t *)userPtr;
-}
+LoDb::freeRecords(users);
 ```
 
 ### Update Pattern (Read-Modify-Write)
@@ -633,7 +631,7 @@ Query records with optional filtering, sorting, and limiting.
 
 **Returns:** Vector of heap-allocated record pointers
 
-**Memory Management:** Caller must free each record with `delete[] (uint8_t *)rec`
+**Memory Management:** Caller must free records using `freeRecords()` or manually with `delete[] (uint8_t *)rec`
 
 **Examples:**
 
@@ -659,11 +657,71 @@ auto sortedAdults = db->select("users", filter, comparator);
 // Select with filter, sort, and limit (top 10)
 auto top10 = db->select("users", filter, comparator, 10);
 
-// Process and free results
+// Process results
 for (auto *ptr : top10) {
     const User *user = (const User *)ptr;
     // ... use user
-    delete[] (uint8_t *)ptr;  // IMPORTANT: Free memory
+}
+
+// Free memory
+LoDb::freeRecords(top10);
+```
+
+#### `freeRecords()`
+
+```cpp
+static void freeRecords(std::vector<void *> &records);
+```
+
+Helper method to free all records in a vector returned by `select()`.
+
+**Parameters:**
+
+- `records`: Vector of record pointers to free (will be cleared after freeing)
+
+**Example:**
+
+```cpp
+auto results = db->select("users");
+// ... use results ...
+LoDb::freeRecords(results);  // Frees all records and clears vector
+```
+
+#### `count()`
+
+```cpp
+int count(const char *table_name, LoDbFilter filter = LoDbFilter());
+```
+
+Count records in a table with optional filtering.
+
+**Parameters:**
+
+- `table_name`: Name of the table to count
+- `filter`: Optional filter function (default: count all records)
+
+**Returns:** Number of matching records, or `-1` on error
+
+**Performance:**
+
+- If no filter is provided, efficiently counts files without loading records
+- If a filter is provided, records are loaded and filtered (less efficient)
+
+**Examples:**
+
+```cpp
+// Count all users
+int totalUsers = db->count("users");
+
+// Count with filter
+auto filter = [](const void *rec) -> bool {
+    const User *u = (const User *)rec;
+    return u->age >= 18;
+};
+int adultUsers = db->count("users", filter);
+
+if (totalUsers >= 0) {
+    LOG_INFO("Total users: %d, Adults: %d", totalUsers, adultUsers);
 }
 ```
 
@@ -726,20 +784,7 @@ for (auto *ptr : results) {
 }
 
 // Clean up - CRITICAL!
-for (auto *ptr : results) {
-    delete[] (uint8_t *)ptr;
-}
-
-// Or use a helper pattern
-auto cleanup = [&results]() {
-    for (auto *ptr : results) {
-        delete[] (uint8_t *)ptr;
-    }
-    results.clear();
-};
-
-// ... use results ...
-cleanup();
+LoDb::freeRecords(results);
 ```
 
 ### Upsert Pattern
@@ -763,6 +808,24 @@ bool upsertUser(LoDb *db, lodb_uuid_t uuid, const User *user) {
     // Other error
     return false;
 }
+```
+
+### Counting Records
+
+Use `count()` to efficiently get the number of records:
+
+```cpp
+// Count all records (efficient - doesn't load records)
+int totalUsers = db->count("users");
+
+// Count with filter (loads and filters records)
+auto activeFilter = [](const void *rec) -> bool {
+    const User *u = (const User *)rec;
+    return u->active;
+};
+int activeUsers = db->count("users", activeFilter);
+
+LOG_INFO("Total: %d users, %d active", totalUsers, activeUsers);
 ```
 
 ### Pagination
