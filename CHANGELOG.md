@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-12-09
+
 ### Minor
 - `freeRecords()` helper method to free records returned by `select()`
 - `count()` method to count records in a table with optional filtering
@@ -39,7 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe filesystem-based storage
 - Protocol Buffers integration with nanopb
 
-[Unreleased]: https://github.com/MeshEnvy/lodb/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/MeshEnvy/lodb/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/MeshEnvy/lodb/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MeshEnvy/lodb/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/MeshEnvy/lodb/compare/v1.0.0...v1.0.2
 [1.0.0]: https://github.com/MeshEnvy/lodb/compare/93496d6...v1.0.0
