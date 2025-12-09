@@ -7,27 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Minor
 - `freeRecords()` helper method to free records returned by `select()`
 - `count()` method to count records in a table with optional filtering
 - Logo assets with logo.pxd and logo.webp
 
 ## [1.1.0] - 2025-12-05
 
-### Changed
+### Patch
+- Version bump
+
+## [1.0.2] - 2025-12-05
+
+### Patch
 - Updated installation documentation to reflect Meshtastic Plugin Manager usage
 
 ## [1.0.0] - 2025-11-28
 
-### Changed
+### Minor
 - Protobuf generation is now automatic (no manual `gen_proto.py` script needed)
-
-### Added
 - Example code demonstrating LoDB usage
 
 ## [Initial Release] - 2025-11-06
 
-### Added
+### Major
 - Synchronous, protobuf-based database for Meshtastic
 - CRUD operations (Create, Read, Update, Delete)
 - SELECT queries with filtering, sorting, and limiting
@@ -37,5 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Protocol Buffers integration with nanopb
 
 [Unreleased]: https://github.com/MeshEnvy/lodb/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/MeshEnvy/lodb/compare/v1.0.0...v1.1.0
+[1.1.0]: https://github.com/MeshEnvy/lodb/compare/v1.0.2...v1.1.0
+[1.0.2]: https://github.com/MeshEnvy/lodb/compare/v1.0.0...v1.0.2
 [1.0.0]: https://github.com/MeshEnvy/lodb/compare/93496d6...v1.0.0
