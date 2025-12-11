@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Minor
+- Migrate to LoFS
+- `truncate()` method to delete all records from a table while keeping it registered
+- `drop()` method to delete all records and unregister a table
+- Add diagnostics test suite exercising multiple databases, tables, and all CRUD operations
+
 ## [1.2.0] - 2025-12-09
 
 ### Minor

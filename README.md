@@ -75,7 +75,13 @@ User.password_hash max_size:32
 #include "LoDB.h"
 #include "myschema.pb.h"
 
+// Auto-select filesystem (SD if available, otherwise LFS)
 LoDb *db = new LoDb("myapp");
+
+// Or explicitly specify filesystem
+LoDb *dbLFS = new LoDb("myapp", LoFS::FSType::LFS);  // Use LittleFS
+LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);    // Use SD card (falls back to LFS if SD unavailable)
+
 db->registerTable("users", &User_msg, sizeof(User));
 ```
 
@@ -102,18 +108,28 @@ err = db->deleteRecord("users", user.uuid);
 
 ### Storage Model
 
-LoDB uses a filesystem-based storage model with a clear directory hierarchy:
+LoDB uses a filesystem-based storage model with a clear directory hierarchy. Databases can be stored on either LittleFS (internal flash) or SD card, depending on availability and your selection:
 
 ```
-/lodb/
+/sd/lodb/          (if SD card is available and selected)
   └── <database_name>/
       └── <table_name>/
           ├── <uuid_hex>.pr
+          └── ...
+
+/lfs/lodb/         (LittleFS - internal flash)
+  └── <database_name>/
+      └── <table_name>/
           ├── <uuid_hex>.pr
           └── ...
 ```
 
 Each record is stored as a separate `.pr` (protobuf) file named with its 16-character hexadecimal UUID.
+
+**Filesystem Selection:**
+- By default, LoDB auto-selects: uses `/sd/lodb/` if SD card is available, otherwise `/lfs/lodb/`
+- You can explicitly specify `LoFS::FSType::LFS` or `LoFS::FSType::SD` in the constructor to force a particular filesystem
+- If SD is requested but unavailable, LoDB automatically falls back to LittleFS
 
 **Example file structure:**
 
@@ -450,19 +466,38 @@ printf("UUID: %s\n", hex); // UUID: a1b2c3d4e5f67890
 #### Constructor
 
 ```cpp
-LoDb(const char *db_name);
+LoDb(const char *db_name, int filesystem = -1);
 ```
 
 Create a new database instance with namespace `db_name`.
 
 **Parameters:**
 
-- `db_name`: Database name (creates `/lodb/{db_name}/` directory)
+- `db_name`: Database name (creates `{prefix}/lodb/{db_name}/` directory)
+- `filesystem`: Optional filesystem type (defaults to `LoFS::FSType::AUTO`):
+  - `LoFS::FSType::LFS` - Use LittleFS (internal flash) at `/lfs/lodb/`
+  - `LoFS::FSType::SD` - Use SD card at `/sd/lodb/` (falls back to LFS if SD unavailable)
+  - `LoFS::FSType::AUTO` or omit - Auto-select: uses SD if available, otherwise LFS
 
-**Example:**
+**Filesystem Selection:**
+
+- **Auto-selection (default)**: If `filesystem` is omitted or `-1`, LoDB automatically selects:
+  - `/sd/lodb/` if SD card is available
+  - `/lfs/lodb/` if SD card is not available
+- **Explicit selection**: Specify `LoFS::FSType::LFS` or `LoFS::FSType::SD` to force a particular filesystem
+- **Fallback**: If `LoFS::FSType::SD` is specified but SD card is unavailable, LoDB automatically falls back to LittleFS
+
+**Examples:**
 
 ```cpp
+// Auto-select filesystem (recommended)
 LoDb *db = new LoDb("myapp");
+
+// Explicitly use LittleFS
+LoDb *dbLFS = new LoDb("myapp", LoFS::FSType::LFS);
+
+// Explicitly use SD card (with automatic fallback to LFS if SD unavailable)
+LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);
 ```
 
 #### `registerTable()`
@@ -723,6 +758,67 @@ int adultUsers = db->count("users", filter);
 if (totalUsers >= 0) {
     LOG_INFO("Total users: %d, Adults: %d", totalUsers, adultUsers);
 }
+```
+
+#### `truncate()`
+
+```cpp
+LoDbError truncate(const char *table_name);
+```
+
+Delete all records from a table but keep the table registered.
+
+**Parameters:**
+
+- `table_name`: Name of the table to truncate
+
+**Returns:**
+
+- `LODB_OK` on success
+- `LODB_ERR_INVALID` if table not registered
+
+**Example:**
+
+```cpp
+// Clear all records from users table
+LoDbError err = db->truncate("users");
+if (err == LODB_OK) {
+    LOG_INFO("Truncated users table");
+}
+
+// Table is still registered, can insert new records
+User newUser = User_init_zero;
+db->insert("users", uuid, &newUser);
+```
+
+#### `drop()`
+
+```cpp
+LoDbError drop(const char *table_name);
+```
+
+Delete all records and unregister the table. The table must be re-registered before use.
+
+**Parameters:**
+
+- `table_name`: Name of the table to drop
+
+**Returns:**
+
+- `LODB_OK` on success
+- `LODB_ERR_INVALID` if table not registered
+
+**Example:**
+
+```cpp
+// Drop the users table completely
+LoDbError err = db->drop("users");
+if (err == LODB_OK) {
+    LOG_INFO("Dropped users table");
+}
+
+// Table is unregistered - must re-register before use
+db->registerTable("users", &User_msg, sizeof(User));
 ```
 
 ## Advanced Usage

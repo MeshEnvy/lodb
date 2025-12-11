@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lofs/src/LoFS.h"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -11,7 +12,8 @@
 /**
  * LoDB - Synchronous Protobuf Database
  *
- * A filesystem-based database for protobuf records stored in /lodb/<db_name>/<table_name>/<uuid>.pr files.
+ * A filesystem-based database for protobuf records stored in {prefix}/lodb/<db_name>/<table_name>/<uuid>.pr files.
+ * Uses /sd/lodb/... if SD card is available, otherwise /lfs/lodb/...
  *
  * SYNCHRONOUS DESIGN:
  * - Single-record operations (get, insert, update, delete) complete immediately
@@ -69,20 +71,22 @@ void lodb_uuid_to_hex(lodb_uuid_t uuid, char hex_out[17]);
  */
 lodb_uuid_t lodb_new_uuid(const char *str, uint64_t salt);
 
-/**
- * LoDB Database Class
- *
- * A database instance with a namespace. Tables within this database
- * are stored at /lodb/{db_name}/{table_name}/
- */
-class LoDb
+    /**
+     * LoDB Database Class
+     *
+     * A database instance with a namespace. Tables within this database
+     * are stored at {prefix}/lodb/{db_name}/{table_name}/
+     * Prefix is /sd if SD card is available, otherwise /lfs
+     */
+    class LoDb
 {
   public:
     /**
      * Create a new database instance
-     * @param db_name Name of the database (creates /lodb/{db_name}/ directory)
+     * @param db_name Name of the database (creates {prefix}/lodb/{db_name}/ directory)
+     * @param filesystem Filesystem type (LoFS::FSType::LFS, LoFS::FSType::SD, or LoFS::FSType::AUTO for auto-select)
      */
-    LoDb(const char *db_name);
+    LoDb(const char *db_name, LoFS::FSType filesystem = LoFS::FSType::AUTO);
 
     /**
      * Destructor
@@ -184,6 +188,20 @@ class LoDb
      */
     int count(const char *table_name, LoDbFilter filter = LoDbFilter());
 
+    /**
+     * Truncate a table - delete all records but keep the table registered
+     * @param table_name Name of the table to truncate
+     * @return LODB_OK on success, LODB_ERR_INVALID if table not registered, error code otherwise
+     */
+    LoDbError truncate(const char *table_name);
+
+    /**
+     * Drop a table - delete all records and unregister the table
+     * @param table_name Name of the table to drop
+     * @return LODB_OK on success, LODB_ERR_INVALID if table not registered, error code otherwise
+     */
+    LoDbError drop(const char *table_name);
+
   private:
     /**
      * Table metadata
@@ -192,11 +210,12 @@ class LoDb
         std::string table_name;
         const pb_msgdesc_t *pb_descriptor;
         size_t record_size;
-        char table_path[160]; // Full path: /lodb/{db_name}/{table_name}/
+        char table_path[160]; // Full path: {prefix}/lodb/{db_name}/{table_name}/
     };
 
     std::string db_name;
-    char db_path[128]; // /lodb/{db_name}/
+    char fs_prefix[8]; // "/sd" or "/lfs"
+    char db_path[128]; // {prefix}/lodb/{db_name}/
     std::map<std::string, TableMetadata> tables;
 
     /**
