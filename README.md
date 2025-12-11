@@ -75,12 +75,12 @@ User.password_hash max_size:32
 #include "LoDB.h"
 #include "myschema.pb.h"
 
-// Auto-select filesystem (SD if available, otherwise LFS)
+// Auto-select filesystem (SD if available, otherwise INTERNAL)
 LoDb *db = new LoDb("myapp");
 
 // Or explicitly specify filesystem
-LoDb *dbLFS = new LoDb("myapp", LoFS::FSType::LFS);  // Use LittleFS
-LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);    // Use SD card (falls back to LFS if SD unavailable)
+LoDb *dbInternal = new LoDb("myapp", LoFS::FSType::INTERNAL);  // Use internal filesystem
+LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);    // Use SD card (falls back to INTERNAL if SD unavailable)
 
 db->registerTable("users", &User_msg, sizeof(User));
 ```
@@ -108,7 +108,7 @@ err = db->deleteRecord("users", user.uuid);
 
 ### Storage Model
 
-LoDB uses a filesystem-based storage model with a clear directory hierarchy. Databases can be stored on either LittleFS (internal flash) or SD card, depending on availability and your selection:
+LoDB uses a filesystem-based storage model with a clear directory hierarchy. Databases can be stored on either internal filesystem (onboard flash) or SD card, depending on availability and your selection:
 
 ```
 /sd/lodb/          (if SD card is available and selected)
@@ -117,7 +117,7 @@ LoDB uses a filesystem-based storage model with a clear directory hierarchy. Dat
           ├── <uuid_hex>.pr
           └── ...
 
-/lfs/lodb/         (LittleFS - internal flash)
+/internal/lodb/         (Internal filesystem - onboard flash)
   └── <database_name>/
       └── <table_name>/
           ├── <uuid_hex>.pr
@@ -127,9 +127,9 @@ LoDB uses a filesystem-based storage model with a clear directory hierarchy. Dat
 Each record is stored as a separate `.pr` (protobuf) file named with its 16-character hexadecimal UUID.
 
 **Filesystem Selection:**
-- By default, LoDB auto-selects: uses `/sd/lodb/` if SD card is available, otherwise `/lfs/lodb/`
-- You can explicitly specify `LoFS::FSType::LFS` or `LoFS::FSType::SD` in the constructor to force a particular filesystem
-- If SD is requested but unavailable, LoDB automatically falls back to LittleFS
+- By default, LoDB auto-selects: uses `/sd/lodb/` if SD card is available, otherwise `/internal/lodb/`
+- You can explicitly specify `LoFS::FSType::INTERNAL` or `LoFS::FSType::SD` in the constructor to force a particular filesystem
+- If SD is requested but unavailable, LoDB automatically falls back to internal filesystem
 
 **Example file structure:**
 
@@ -475,17 +475,17 @@ Create a new database instance with namespace `db_name`.
 
 - `db_name`: Database name (creates `{prefix}/lodb/{db_name}/` directory)
 - `filesystem`: Optional filesystem type (defaults to `LoFS::FSType::AUTO`):
-  - `LoFS::FSType::LFS` - Use LittleFS (internal flash) at `/lfs/lodb/`
-  - `LoFS::FSType::SD` - Use SD card at `/sd/lodb/` (falls back to LFS if SD unavailable)
-  - `LoFS::FSType::AUTO` or omit - Auto-select: uses SD if available, otherwise LFS
+  - `LoFS::FSType::INTERNAL` - Use internal filesystem (onboard flash) at `/internal/lodb/`
+  - `LoFS::FSType::SD` - Use SD card at `/sd/lodb/` (falls back to INTERNAL if SD unavailable)
+  - `LoFS::FSType::AUTO` or omit - Auto-select: uses SD if available, otherwise INTERNAL
 
 **Filesystem Selection:**
 
 - **Auto-selection (default)**: If `filesystem` is omitted or `-1`, LoDB automatically selects:
   - `/sd/lodb/` if SD card is available
-  - `/lfs/lodb/` if SD card is not available
-- **Explicit selection**: Specify `LoFS::FSType::LFS` or `LoFS::FSType::SD` to force a particular filesystem
-- **Fallback**: If `LoFS::FSType::SD` is specified but SD card is unavailable, LoDB automatically falls back to LittleFS
+  - `/internal/lodb/` if SD card is not available
+- **Explicit selection**: Specify `LoFS::FSType::INTERNAL` or `LoFS::FSType::SD` to force a particular filesystem
+- **Fallback**: If `LoFS::FSType::SD` is specified but SD card is unavailable, LoDB automatically falls back to internal filesystem
 
 **Examples:**
 
@@ -493,10 +493,10 @@ Create a new database instance with namespace `db_name`.
 // Auto-select filesystem (recommended)
 LoDb *db = new LoDb("myapp");
 
-// Explicitly use LittleFS
-LoDb *dbLFS = new LoDb("myapp", LoFS::FSType::LFS);
+// Explicitly use internal filesystem
+LoDb *dbInternal = new LoDb("myapp", LoFS::FSType::INTERNAL);
 
-// Explicitly use SD card (with automatic fallback to LFS if SD unavailable)
+// Explicitly use SD card (with automatic fallback to INTERNAL if SD unavailable)
 LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);
 ```
 

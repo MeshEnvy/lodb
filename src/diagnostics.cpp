@@ -18,10 +18,10 @@ void lodb_diagnostics()
         "/sd/lodb/test_db_2",
         "/sd/lodb/test_db_3",
         "/sd/lodb/test_db_4",
-        "/lfs/lodb/test_db_1",
-        "/lfs/lodb/test_db_2",
-        "/lfs/lodb/test_db_3",
-        "/lfs/lodb/test_db_4",
+        "/internal/lodb/test_db_1",
+        "/internal/lodb/test_db_2",
+        "/internal/lodb/test_db_3",
+        "/internal/lodb/test_db_4",
     };
     size_t numCleanupDirs = sizeof(cleanupDirs) / sizeof(cleanupDirs[0]);
     for (size_t i = 0; i < numCleanupDirs; i++) {
@@ -32,7 +32,7 @@ void lodb_diagnostics()
     LOG_INFO("--- Test 1: Filesystem Availability and Database Initialization ---");
     bool sdAvailable = LoFS::isSDCardAvailable();
     LOG_INFO("SD Card available: %s", sdAvailable ? "YES" : "NO");
-    LOG_INFO("Expected database location: %s", sdAvailable ? "/sd/lodb/" : "/lfs/lodb/");
+    LOG_INFO("Expected database location: %s", sdAvailable ? "/sd/lodb/" : "/internal/lodb/");
     LOG_INFO("");
 
     // Test 2: Create Multiple Databases with Filesystem Selection
@@ -40,11 +40,11 @@ void lodb_diagnostics()
     
     // Test auto-selection (default behavior)
     LoDb *db1 = new LoDb("test_db_1");
-    LOG_INFO("Created db1 with auto-selection: %s", sdAvailable ? "/sd/lodb/test_db_1" : "/lfs/lodb/test_db_1");
+    LOG_INFO("Created db1 with auto-selection: %s", sdAvailable ? "/sd/lodb/test_db_1" : "/internal/lodb/test_db_1");
     
-    // Test explicit LittleFS
-    LoDb *db2 = new LoDb("test_db_2", LoFS::FSType::LFS);
-    LOG_INFO("Created db2 with explicit LoFS::FSType::LFS: /lfs/lodb/test_db_2");
+    // Test explicit internal filesystem
+    LoDb *db2 = new LoDb("test_db_2", LoFS::FSType::INTERNAL);
+    LOG_INFO("Created db2 with explicit LoFS::FSType::INTERNAL: /internal/lodb/test_db_2");
     
     // Test explicit SD (if available)
     LoDb *db3 = nullptr;
@@ -55,11 +55,11 @@ void lodb_diagnostics()
         LOG_INFO("Skipping db3 with LoFS::FSType::SD (SD card not available)");
     }
     
-    // Test SD request when SD not available (should fall back to LFS)
+    // Test SD request when SD not available (should fall back to INTERNAL)
     LoDb *db4 = nullptr;
     if (!sdAvailable) {
         db4 = new LoDb("test_db_4", LoFS::FSType::SD);
-        LOG_INFO("Created db4 with LoFS::FSType::SD (fallback to LFS): /lfs/lodb/test_db_4");
+        LOG_INFO("Created db4 with LoFS::FSType::SD (fallback to internal filesystem): /internal/lodb/test_db_4");
     }
     
     LOG_INFO("");

@@ -69,21 +69,21 @@ LoDb::LoDb(const char *db_name, LoFS::FSType filesystem) : db_name(db_name)
             strncpy(fs_prefix, "/sd", sizeof(fs_prefix) - 1);
             fs_prefix[sizeof(fs_prefix) - 1] = '\0';
         } else {
-            LOG_WARN("SD card requested but not available, falling back to LittleFS");
-            strncpy(fs_prefix, "/lfs", sizeof(fs_prefix) - 1);
+            LOG_WARN("SD card requested but not available, falling back to internal filesystem");
+            strncpy(fs_prefix, "/internal", sizeof(fs_prefix) - 1);
             fs_prefix[sizeof(fs_prefix) - 1] = '\0';
         }
-    } else if (filesystem == LoFS::FSType::LFS) {
-        // Explicitly request LittleFS
-        strncpy(fs_prefix, "/lfs", sizeof(fs_prefix) - 1);
+    } else if (filesystem == LoFS::FSType::INTERNAL) {
+        // Explicitly request internal filesystem
+        strncpy(fs_prefix, "/internal", sizeof(fs_prefix) - 1);
         fs_prefix[sizeof(fs_prefix) - 1] = '\0';
     } else {
-        // Auto-select: use SD if available, otherwise LFS
+        // Auto-select: use SD if available, otherwise internal filesystem
         if (LoFS::isSDCardAvailable()) {
             strncpy(fs_prefix, "/sd", sizeof(fs_prefix) - 1);
             fs_prefix[sizeof(fs_prefix) - 1] = '\0';
         } else {
-            strncpy(fs_prefix, "/lfs", sizeof(fs_prefix) - 1);
+            strncpy(fs_prefix, "/internal", sizeof(fs_prefix) - 1);
             fs_prefix[sizeof(fs_prefix) - 1] = '\0';
         }
     }
