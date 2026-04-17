@@ -4,8 +4,8 @@
   "description": "Filesystem-backed synchronous protobuf database for Arduino firmware (uses LoFS); nanopb diagnostics bindings included",
   "keywords": ["meshtastic", "protobuf", "database", "littlefs", "lodb", "nanopb"],
   "authors": {
-    "name": "MeshEnvy",
-    "url": "https://github.com/MeshEnvy"
+    "name": "Ben Allfree",
+    "url": "https://github.com/benallfree"
   },
   "repository": {
     "type": "git",
