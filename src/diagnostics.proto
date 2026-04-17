@@ -1,15 +1,9 @@
 syntax = "proto3";
 
-package meshtastic;
+package lodb;
 
-option csharp_namespace = "Meshtastic.Protobufs";
-option go_package = "github.com/meshtastic/go/generated";
-option java_outer_classname = "LoDBDiagnosticsProtos";
-option java_package = "com.geeksville.mesh";
-option swift_prefix = "";
-
-// Simple test message for LoDB diagnostics
-message LoDBDiagnosticsTest {
+// Optional diagnostics record type shipped with LoDB (nanopb bindings in-tree).
+message DiagnosticsTest {
   uint32 id = 1;
   string value = 2;
   uint32 timestamp = 3;

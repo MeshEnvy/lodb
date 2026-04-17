@@ -1,6 +1,6 @@
-# LoDB - Micro Database for Meshtastic
+# LoDB - Protobuf-on-files database
 
-**A Meshtastic firmware plugin providing a synchronous, protobuf-based database**
+**A synchronous protobuf-on-files database for Arduino-style firmware; uses [LoFS](https://github.com/MeshEnvy/lofs) for filesystem access**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -13,36 +13,42 @@ LoDB provides CRUD operations with powerful SELECT queries supporting filtering,
 - **CRUD Operations**: Create, Read, Update, and Delete records with simple API calls
 - **Powerful Queries**: SELECT with filtering, sorting, and limiting in a single operation
 - **Deterministic UUIDs**: Generate consistent UUIDs from strings or auto-generate unique ones
-- **Thread-Safe**: Built-in locking for concurrent access
-- **Filesystem-Based**: Simple, human-readable file structure on any filesystem
+- **Thread-safe FS access**: Operations go through LoFS, which takes `spiLock` per call
+- **Filesystem-based**: Records under `/lodb/...` by default, or `/internal/lodb/...` / `/sd/lodb/...` when you pick a filesystem explicitly
 - **Memory Efficient**: Designed for resource-constrained embedded systems
 
 ## Installation
 
-LoDB is a Meshtastic plugin that is automatically discovered and integrated by the Meshtastic Plugin Manager (MPM). To install LoDB:
+### PlatformIO (library)
 
-1. **Install the Meshtastic Plugin Manager:**
+Add LoDB to `lib_deps`. It depends on **LoFS**, **nanopb**, and **rweather/Crypto** (see `library.json`). Your firmware still supplies **your** table schemas (`.proto` / generated `*_pb.h` for your app). The library ships **pre-generated nanopb** headers under **`include/lodb/`** for the optional **`lodb.DiagnosticsTest`** type (`diagnostics.pb.h`); the matching **`diagnostics.pb.c`** is compiled from **`src/`**.
 
-```bash
-pip install mesh-plugin-manager
+```ini
+lib_deps =
+  https://github.com/MeshEnvy/lodb.git
 ```
 
-2. **Install LoDB:**
+Optional logging (define before including `<lodb/LoDB.h>`):
 
-```bash
-cd /path/to/meshtastic/firmware
-mpm install lodb
+```cpp
+#define LODB_LOG_DEBUG(...) LOG_DEBUG(__VA_ARGS__)
+#define LODB_LOG_INFO(...)  LOG_INFO(__VA_ARGS__)
+#define LODB_LOG_WARN(...)  LOG_WARN(__VA_ARGS__)
+#define LODB_LOG_ERROR(...) LOG_ERROR(__VA_ARGS__)
 ```
 
-3. **Build and flash:**
+Override weak **`lodb_now_ms()`** if you need wall time for auto-UUIDs (default: `millis()`).
 
-The Meshtastic Plugin Manager automatically discovers the plugin, generates protobuf files (if the plugin uses any), and integrates it into the build. Simply build and flash as usual:
+**Regenerating shipped nanopb** (when editing `src/diagnostics.proto`): run `vendor/lodb/scripts/regen_nanopb.sh` (requires Python package `nanopb`).
 
-```bash
-pio run -e esp32 -t upload
+**Public includes** (no `src/` in the path):
+
+```cpp
+#include <lodb/LoDB.h>
+// or: #include <lodb/lodb.h>
+#include <lodb/diagnostics.pb.h>  // optional: shipped diagnostics message
+#include <lodb/diagnostics.h>     // optional: declares lodb_diagnostics()
 ```
-
-**Note:** For detailed information about Meshtastic plugin development, see the [Plugin Development Guide](/path/to/meshtastic/src/plugins/README.md).
 
 ## Getting Started
 
@@ -67,25 +73,23 @@ User.username max_size:32
 User.password_hash max_size:32
 ```
 
-**Note:** Protobuf generation is handled automatically by the Meshtastic Plugin Manager.
+**Note:** Generate nanopb headers for your own `.proto` files with the [nanopb](https://github.com/nanopb/nanopb) generator (or your firmware’s existing protobuf pipeline).
 
 **Initialize the database:**
 
 ```cpp
-#include "LoDB.h"
+#include <lodb/LoDB.h>
 #include "myschema.pb.h"
 
-// Auto-select filesystem (SD if available, otherwise INTERNAL)
+// Default: legacy `/lodb/...` on internal flash (see LoDB constructor docs)
 LoDb *db = new LoDb("myapp");
 
 // Or explicitly specify filesystem
-LoDb *dbInternal = new LoDb("myapp", LoFS::FSType::INTERNAL);  // Use internal filesystem
-LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);    // Use SD card (falls back to INTERNAL if SD unavailable)
+LoDb *dbInternal = new LoDb("myapp", LoFS::FSType::INTERNAL);
+LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);
 
 db->registerTable("users", &User_msg, sizeof(User));
 ```
-
-**Note:** The include path is simply `"LoDB.h"` because the plugin's `src/` directory is automatically added to the compiler's include path.
 
 **Perform CRUD operations:**
 
@@ -106,227 +110,76 @@ err = db->deleteRecord("users", user.uuid);
 
 ## Under the Hood
 
-### Storage Model
+### Storage model
 
-LoDB uses a filesystem-based storage model with a clear directory hierarchy. Databases can be stored on either internal filesystem (onboard flash) or SD card, depending on availability and your selection:
+Each record is one `.pr` file named with a 16-character hex UUID. Layout depends on the `LoFS::FSType` you pass to `LoDb`:
 
-```
-/sd/lodb/          (if SD card is available and selected)
-  └── <database_name>/
-      └── <table_name>/
-          ├── <uuid_hex>.pr
-          └── ...
+- **`LoFS::FSType::AUTO` (default):** **`/lodb/<database>/<table>/<uuid>.pr`** (unprefixed path; LoFS routes to internal flash — matches older single-partition layouts).
+- **`LoFS::FSType::INTERNAL`:** **`/internal/lodb/<database>/…`**
+- **`LoFS::FSType::SD`:** **`/sd/lodb/<database>/…`** when SD is available; otherwise LoDB falls back to **`/internal/lodb/…`** with a warning.
 
-/internal/lodb/         (Internal filesystem - onboard flash)
-  └── <database_name>/
-      └── <table_name>/
-          ├── <uuid_hex>.pr
-          └── ...
-```
-
-Each record is stored as a separate `.pr` (protobuf) file named with its 16-character hexadecimal UUID.
-
-**Filesystem Selection:**
-- By default, LoDB auto-selects: uses `/sd/lodb/` if SD card is available, otherwise `/internal/lodb/`
-- You can explicitly specify `LoFS::FSType::INTERNAL` or `LoFS::FSType::SD` in the constructor to force a particular filesystem
-- If SD is requested but unavailable, LoDB automatically falls back to internal filesystem
-
-**Example file structure:**
+### Example on-disk layout (AUTO)
 
 ```
-/lodb/lobbs/
-  ├── users/
-  │   ├── a1b2c3d4e5f67890.pr
-  │   └── 1234567890abcdef.pr
-  ├── sessions/
-  │   └── 00000000deadbeef.pr
-  └── mail/
-      ├── f0e1d2c3b4a59687.pr
-      └── 9876543210fedcba.pr
+/lodb/myapp/
+  └── items/
+      ├── a1b2c3d4e5f67890.pr
+      └── 1234567890abcdef.pr
 ```
 
-### Thread Safety
+### Thread safety
 
-All filesystem operations use `LockGuard(spiLock)` to ensure thread-safe access across concurrent operations.
+Filesystem calls use **LoFS**, which acquires `LockGuard(spiLock)` inside each `LoFS::open` / `mkdir` / `remove` (and related) call. LoDB does not take `spiLock` itself, to avoid deadlocking with LoFS’s non-recursive mutex.
 
-### UUID System
+### UUIDs
 
-LoDB uses 64-bit unsigned integers as UUIDs:
+- **Deterministic:** `lodb_new_uuid("key", salt)` — SHA-256 of string + salt, first 8 bytes as `uint64_t`.
+- **Auto:** `lodb_new_uuid(nullptr, salt)` — uses weak **`lodb_now_ms()`** (default `millis()`) plus randomness; override **`lodb_now_ms()`** in your firmware if you need wall time.
+- **Filenames:** `lodb_uuid_to_hex()` → 16 hex chars + `.pr`.
 
-- **Deterministic UUIDs**: Generated from strings using SHA256 with optional salt (useful for lookups by key)
-- **Auto-generated UUIDs**: Created from timestamp + random value for unique records
-- **Hex Format**: UUIDs are formatted as 16-character hex strings for filenames
+### Patterns (generic)
 
-### Table Registration
+**Register a table** (your nanopb message `User` from your own `.proto`):
 
 ```cpp
-LoBBSDal::LoBBSDal(uint32_t hostNodeId) : hostNodeId(hostNodeId)
-{
-    // Initialize LoDB database
-    db = new LoDb("lobbs");
-
-    // Register tables with their protobuf descriptors
-    db->registerTable("users", &meshtastic_LoBBSUser_msg, sizeof(meshtastic_LoBBSUser));
-    db->registerTable("sessions", &meshtastic_LoBBSSession_msg, sizeof(meshtastic_LoBBSSession));
-    db->registerTable("mail", &meshtastic_LoBBSMail_msg, sizeof(meshtastic_LoBBSMail));
-}
+LoDb db("myapp");
+db.registerTable("users", &User_msg, sizeof(User));
 ```
 
-### Deterministic UUIDs for Lookups
+**Deterministic id + get:**
 
 ```cpp
-bool LoBBSDal::loadUserByUsername(const char *username, meshtastic_LoBBSUser *user)
-{
-    // Normalize username to lowercase for case-insensitive lookup
-    char normalized[LOBBS_USERNAME_BUFFER_SIZE];
-    normalizeUsername(username, normalized);
-
-    // Convert username to UUID with host node ID as salt
-    lodb_uuid_t userUuid = lodb_new_uuid(normalized, hostNodeId);
-
-    // Look up user by deterministic UUID
-    LoDbError err = db->get("users", userUuid, user);
-    return (err == LODB_OK);
-}
+lodb_uuid_t id = lodb_new_uuid("alice", nodeSalt);
+User u = User_init_zero;
+if (db.get("users", id, &u) == LODB_OK) { /* ... */ }
 ```
 
-### User Creation with Session Management
+**Select with filter, sort, limit:**
 
 ```cpp
-bool LoBBSDal::createUser(const char *username, const char *password, uint32_t nodeId)
-{
-    // Normalize username for case-insensitive storage
-    char normalized[LOBBS_USERNAME_BUFFER_SIZE];
-    normalizeUsername(username, normalized);
-
-    // Calculate deterministic UUID
-    lodb_uuid_t userUuid = lodb_new_uuid(normalized, hostNodeId);
-
-    // Create and populate user record
-    meshtastic_LoBBSUser user = meshtastic_LoBBSUser_init_zero;
-    strncpy(user.username, username, sizeof(user.username) - 1);
-    user.uuid = userUuid;
-    user.password_hash.size = 32;
-    hashPassword(password, user.password_hash.bytes);
-
-    // Insert into database
-    LoDbError err = db->insert("users", userUuid, &user);
-    if (err != LODB_OK) {
-        LOG_ERROR("Failed to create user: %s", username);
-        return false;
-    }
-
-    LOG_INFO("Created user: %s", username);
-
-    // Log in the user (create session)
-    return loginUser(username, nodeId);
-}
-```
-
-### Filtering with Lambdas
-
-```cpp
-// Get all mail messages for a specific user
-std::vector<void *> LoBBSDal::getMailForUser(uint64_t userUuid, uint32_t offset, uint32_t limit)
-{
-    // Build filter lambda that captures userUuid
-    auto mail_filter = [userUuid](const void *rec) -> bool {
-        const meshtastic_LoBBSMail *m = (const meshtastic_LoBBSMail *)rec;
-        return m->to_user_uuid == userUuid;
-    };
-
-    // Comparator for sorting by timestamp descending (newest first)
-    auto comparator = [](const void *a, const void *b) -> int {
-        const meshtastic_LoBBSMail *m1 = (const meshtastic_LoBBSMail *)a;
-        const meshtastic_LoBBSMail *m2 = (const meshtastic_LoBBSMail *)b;
-        // Reverse order: newer (larger timestamp) first
-        if (m2->timestamp > m1->timestamp) return 1;
-        if (m2->timestamp < m1->timestamp) return -1;
-        return 0;
-    };
-
-    // Execute select with filter and sort
-    auto allMail = db->select("mail", mail_filter, comparator);
-
-    // Manual offset/limit handling
-    std::vector<void *> result;
-    for (size_t i = offset; i < allMail.size() && i < offset + limit; i++) {
-        result.push_back(allMail[i]);
-    }
-
-    // Free records not included in result
-    for (size_t i = 0; i < allMail.size(); i++) {
-        if (i < offset || i >= offset + limit) {
-            delete[] (uint8_t *)allMail[i];
-        }
-    }
-
-    return result;
-}
-```
-
-### User Directory with Search
-
-```cpp
-// From LoBBSModule.cpp - /users command with optional filter
-char *filterStr = strtok(NULL, " ");
-
-// Build filter lambda for username matching (captures filterStr)
-auto username_filter = [filterStr](const void *rec) -> bool {
-    const meshtastic_LoBBSUser *u = (const meshtastic_LoBBSUser *)rec;
-    return !filterStr || !filterStr[0] || stristr(u->username, filterStr) != nullptr;
+auto active = [](const void *r) -> bool {
+  return ((const User *)r)->active;
 };
-
-// Comparator for alphabetical sorting
-auto comparator = [](const void *a, const void *b) -> int {
-    const meshtastic_LoBBSUser *u1 = (const meshtastic_LoBBSUser *)a;
-    const meshtastic_LoBBSUser *u2 = (const meshtastic_LoBBSUser *)b;
-    return strcasecmp(u1->username, u2->username);
+auto byName = [](const void *a, const void *b) -> int {
+  return strcmp(((const User *)a)->name, ((const User *)b)->name);
 };
-
-// Execute synchronous select with filter and sort
-auto users = db->select("users", username_filter, comparator);
-
-// Use results
-for (size_t i = 0; i < users.size(); i++) {
-    const meshtastic_LoBBSUser *u = (const meshtastic_LoBBSUser *)users[i];
-    // ... process user
-}
-
-// Free allocated records
-LoDb::freeRecords(users);
+auto rows = db.select("users", active, byName, 10);
+// ... use rows ...
+LoDb::freeRecords(rows);
 ```
 
-### Update Pattern (Read-Modify-Write)
+**Read–modify–write:**
 
 ```cpp
-bool LoBBSDal::markMailAsRead(uint64_t mailUuid)
-{
-    // Load the mail record
-    meshtastic_LoBBSMail mail = meshtastic_LoBBSMail_init_zero;
-    LoDbError err = db->get("mail", mailUuid, &mail);
-    if (err != LODB_OK) {
-        LOG_WARN("Mail not found: " LODB_UUID_FMT, LODB_UUID_ARGS(mailUuid));
-        return false;
-    }
-
-    // Modify the field
-    mail.read = true;
-
-    // Update in database
-    err = db->update("mail", mailUuid, &mail);
-    if (err != LODB_OK) {
-        LOG_ERROR("Failed to mark mail as read: " LODB_UUID_FMT, LODB_UUID_ARGS(mailUuid));
-        return false;
-    }
-
-    return true;
-}
+User u = User_init_zero;
+if (db.get("users", uuid, &u) != LODB_OK) return;
+u.score = 42;
+db.update("users", uuid, &u);
 ```
 
-## Examples
+### Optional diagnostics
 
-LoDB was built for LoBBS. Check out the [LoBBS repo](https://github.com/MeshEnvy/lobbs) for a complete application that uses LoDB.
+For bring-up, you can call **`lodb_diagnostics()`** (see `<lodb/diagnostics.h>`). It uses the shipped **`lodb.DiagnosticsTest`** type (`<lodb/diagnostics.pb.h>`) to exercise CRUD, `select`, `count`, `truncate`, and `drop` against temporary databases under `/lodb`, `/internal/lodb`, and `/sd/lodb`.
 
 ## API Reference
 
@@ -466,37 +319,24 @@ printf("UUID: %s\n", hex); // UUID: a1b2c3d4e5f67890
 #### Constructor
 
 ```cpp
-LoDb(const char *db_name, int filesystem = -1);
+LoDb(const char *db_name, LoFS::FSType filesystem = LoFS::FSType::AUTO);
 ```
 
 Create a new database instance with namespace `db_name`.
 
 **Parameters:**
 
-- `db_name`: Database name (creates `{prefix}/lodb/{db_name}/` directory)
-- `filesystem`: Optional filesystem type (defaults to `LoFS::FSType::AUTO`):
-  - `LoFS::FSType::INTERNAL` - Use internal filesystem (onboard flash) at `/internal/lodb/`
-  - `LoFS::FSType::SD` - Use SD card at `/sd/lodb/` (falls back to INTERNAL if SD unavailable)
-  - `LoFS::FSType::AUTO` or omit - Auto-select: uses SD if available, otherwise INTERNAL
-
-**Filesystem Selection:**
-
-- **Auto-selection (default)**: If `filesystem` is omitted or `-1`, LoDB automatically selects:
-  - `/sd/lodb/` if SD card is available
-  - `/internal/lodb/` if SD card is not available
-- **Explicit selection**: Specify `LoFS::FSType::INTERNAL` or `LoFS::FSType::SD` to force a particular filesystem
-- **Fallback**: If `LoFS::FSType::SD` is specified but SD card is unavailable, LoDB automatically falls back to internal filesystem
+- `db_name`: Database name (directory under the LoDB root for the chosen filesystem mode).
+- `filesystem`:
+  - **`AUTO` (default):** **`/lodb/<db_name>/`** on internal flash (legacy layout).
+  - **`INTERNAL`:** **`/internal/lodb/<db_name>/`**
+  - **`SD`:** **`/sd/lodb/<db_name>/`** when SD is available; otherwise **`/internal/lodb/<db_name>/`** with a warning.
 
 **Examples:**
 
 ```cpp
-// Auto-select filesystem (recommended)
 LoDb *db = new LoDb("myapp");
-
-// Explicitly use internal filesystem
 LoDb *dbInternal = new LoDb("myapp", LoFS::FSType::INTERNAL);
-
-// Explicitly use SD card (with automatic fallback to INTERNAL if SD unavailable)
 LoDb *dbSD = new LoDb("myapp", LoFS::FSType::SD);
 ```
 
@@ -957,9 +797,9 @@ std::vector<void *> getPage(LoDb *db, size_t pageNum) {
 
 ### Requirements
 
-- Python 3.x
-- nanopb 0.4.9+ (included in Meshtastic firmware)
-- Meshtastic 2.7 or higher
+- **Arduino-style** build (as used by PlatformIO `framework = arduino`)
+- **nanopb** 0.4.9+ (pulled via `library.json` when you depend on LoDB as a PlatformIO library, or supplied by your firmware)
+- **LoFS** and **rweather/Crypto** (also listed in `library.json`)
 
 ## License
 

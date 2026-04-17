@@ -7,11 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Minor
-- Migrate to LoFS
-- `truncate()` method to delete all records from a table while keeping it registered
-- `drop()` method to delete all records and unregister a table
-- Add diagnostics test suite exercising multiple databases, tables, and all CRUD operations
+### Added
+
+- **PlatformIO** `library.json` with dependencies on LoFS, nanopb (source zip), and rweather/Crypto.
+- **Shipped nanopb codegen** for `lodb.DiagnosticsTest`: `include/lodb/diagnostics.pb.h` plus `src/diagnostics.pb.c`; maintainer regen via `scripts/regen_nanopb.sh`.
+- **`LODB_VERSION`**, default no-op **`LODB_LOG_*`**, and weak **`lodb_now_ms()`** (default `millis()`).
+
+### Changed
+
+- Public headers under **`include/lodb/`** — use **`#include <lodb/LoDB.h>`** (or **`<lodb/lodb.h>`**). Shipped **`diagnostics.pb.h`** lives there; **`diagnostics.pb.c`** stays in **`src/`** for PlatformIO compilation.
+- Core uses **LoFS** only (no direct `FSCom` / outer `spiLock` in LoDB). **`LoFS::FSType::AUTO`** uses legacy **`/lodb/...`** for existing on-flash data; **`INTERNAL`** / **`SD`** use **`/internal/lodb/...`** and **`/sd/lodb/...`**.
+- **`truncate()`** / **`drop()`** table lifecycle APIs (unchanged API surface from the LoFS migration branch).
+- **`lodb_new_uuid`** auto branch uses **`lodb_now_ms()`** instead of Meshtastic **`getTime()`** in the library default.
+- **`diagnostics.proto`** moved to **`package lodb`** (was `meshtastic`); diagnostics code uses **`lodb_DiagnosticsTest_*`**.
+
+### Removed
+
+- Meshtastic **module** surface (`LoDBModule`, `plugin.h`, legacy module registration macros).
+- **`examples/log-messages/`** demo module.
+- **`.gitignore` `*.pb.*` rule** so shipped `diagnostics.pb.{h,c}` stay tracked.
 
 ## [1.2.0] - 2025-12-09
 
@@ -28,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.2] - 2025-12-05
 
 ### Patch
-- Updated installation documentation to reflect Meshtastic Plugin Manager usage
+- Updated installation documentation for the plugin distribution model
 
 ## [1.0.0] - 2025-11-28
 

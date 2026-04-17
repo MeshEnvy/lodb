@@ -1,1 +1,1 @@
-meshtastic.LoDBDiagnosticsTest.value max_size:64
+lodb.DiagnosticsTest.value max_size:64
