@@ -45,7 +45,6 @@ Override weak **`lodb_now_ms()`** if you need wall time for auto-UUIDs (default:
 
 ```cpp
 #include <lodb/LoDB.h>
-// or: #include <lodb/lodb.h>
 #include <lodb/diagnostics.pb.h>  // optional: shipped diagnostics message
 #include <lodb/diagnostics.h>     // optional: declares lodb_diagnostics()
 ```

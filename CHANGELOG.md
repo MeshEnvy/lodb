@@ -13,9 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shipped nanopb codegen** for `lodb.DiagnosticsTest`: `include/lodb/diagnostics.pb.h` plus `src/diagnostics.pb.c`; maintainer regen via `scripts/regen_nanopb.sh`.
 - **`LODB_VERSION`**, default no-op **`LODB_LOG_*`**, and weak **`lodb_now_ms()`** (default `millis()`).
 
+### Removed
+
+- Alternate public header **`lodb.h`** (case-only alias of **`LoDB.h`**). Use **`#include <lodb/LoDB.h>`** only.
+
 ### Changed
 
-- Public headers under **`include/lodb/`** — use **`#include <lodb/LoDB.h>`** (or **`<lodb/lodb.h>`**). Shipped **`diagnostics.pb.h`** lives there; **`diagnostics.pb.c`** stays in **`src/`** for PlatformIO compilation.
+- Public headers under **`include/lodb/`** — use **`#include <lodb/LoDB.h>`**. Shipped **`diagnostics.pb.h`** lives there; **`diagnostics.pb.c`** stays in **`src/`** for PlatformIO compilation.
 - Core uses **LoFS** only (no direct `FSCom` / outer `spiLock` in LoDB). **`LoFS::FSType::AUTO`** uses legacy **`/lodb/...`** for existing on-flash data; **`INTERNAL`** / **`SD`** use **`/internal/lodb/...`** and **`/sd/lodb/...`**.
 - **`truncate()`** / **`drop()`** table lifecycle APIs (unchanged API surface from the LoFS migration branch).
 - **`lodb_new_uuid`** auto branch uses **`lodb_now_ms()`** instead of Meshtastic **`getTime()`** in the library default.

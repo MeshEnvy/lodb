@@ -18,7 +18,7 @@
  */
 
 #ifndef LODB_VERSION
-#define LODB_VERSION "1.3.0"
+#define LODB_VERSION "1.4.0"
 #endif
 
 #ifndef LODB_LOG_DEBUG
